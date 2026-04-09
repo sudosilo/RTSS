@@ -663,6 +663,13 @@
     Restaurant Technology Site Survey <span>v0.1</span><br>
     Survey ID: <input id="surveyId" type="text" value="—" style="background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--accent);font-family:'DM Mono',monospace;font-size:11px;width:160px;outline:none;padding:0 2px;" onfocus="this.select()" oninput="updateSurveyId(this.value)">
   </div>
+  <div style="display:flex;align-items:center;gap:8px;margin-left:auto">
+    <span style="font-family:DM Mono,monospace;font-size:10px;color:#666;letter-spacing:2px;text-transform:uppercase">Site:</span>
+    <select id="site-select" onchange="switchSite(this.value)" style="background:#1a1a1a;border:1px solid #333;color:#6dbf6d;font-family:DM Mono,monospace;font-size:12px;padding:4px 8px;outline:none;height:30px"></select>
+    <button onclick="openSiteManager()" style="background:transparent;border:1px solid #333;color:#6dbf6d;font-family:DM Mono,monospace;font-size:10px;padding:4px 10px;cursor:pointer;letter-spacing:1px;text-transform:uppercase">Sites</button>
+    <button onclick="saveSiteData()" style="background:transparent;border:1px solid #6dbf6d;color:#6dbf6d;font-family:DM Mono,monospace;font-size:10px;padding:4px 10px;cursor:pointer;letter-spacing:1px;text-transform:uppercase">Save</button>
+    <span id="api-status" style="font-family:DM Mono,monospace;font-size:10px;letter-spacing:1px"></span>
+  </div>
 </header>
 
 <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
@@ -4148,6 +4155,221 @@ function exportAll() {
 }
 
 // Add Page 3 button to Form 2 actions
+
+// ==================== RIE API ====================
+const API = 'https://rie-api-production.up.railway.app';
+let appState = { sites: {} };
+let activeSiteId = null;
+
+async function apiFetch(path, method, body) {
+  const opts = { method: method || 'GET', headers: { 'Content-Type': 'application/json' } };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(API + path, opts);
+  if (!res.ok) throw new Error('API error ' + res.status);
+  return res.json();
+}
+
+function showStatus(msg, color) {
+  const el = document.getElementById('api-status');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.color = color || '#666';
+  if (color === '#6dbf6d') setTimeout(() => { el.textContent = ''; }, 3000);
+}
+
+async function loadApp() {
+  showStatus('Connecting...', '#ffb347');
+  try {
+    const sites = await apiFetch('/sites');
+    appState.sites = {};
+    sites.forEach(s => { appState.sites[s.id] = { name: s.name }; });
+    if (Object.keys(appState.sites).length === 0) {
+      const id = 'site-' + Date.now();
+      await apiFetch('/sites', 'POST', { id, name: 'Default Site' });
+      appState.sites[id] = { name: 'Default Site' };
+    }
+    const saved = localStorage.getItem('rtss_activeSite');
+    activeSiteId = (saved && appState.sites[saved]) ? saved : Object.keys(appState.sites)[0];
+    buildSiteSelect();
+    await loadSiteData(activeSiteId);
+    showStatus('Connected', '#6dbf6d');
+  } catch(e) {
+    showStatus('API offline', '#ff4444');
+  }
+}
+
+async function loadSiteData(id) {
+  try {
+    const data = await apiFetch('/sites/' + id + '/survey');
+    if (data && Object.keys(data).length > 0) populateRTSSFields(data);
+  } catch(e) {}
+}
+
+async function saveSiteData() {
+  const data = collectRTSSFields();
+  try {
+    await apiFetch('/sites/' + activeSiteId + '/survey', 'PUT', data);
+    showStatus('Saved', '#6dbf6d');
+  } catch(e) {
+    showStatus('Save failed', '#ff4444');
+  }
+}
+
+function collectRTSSFields() {
+  const get = id => { const el = document.getElementById(id); return el ? el.value : ''; };
+  const data = {};
+  document.querySelectorAll('input[id], select[id], textarea[id]').forEach(el => {
+    data[el.id] = el.type === 'checkbox' ? el.checked : el.value;
+  });
+  return data;
+}
+
+function populateRTSSFields(data) {
+  Object.entries(data).forEach(([id, val]) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (el.type === 'checkbox') el.checked = val;
+    else el.value = val;
+  });
+}
+
+function buildSiteSelect() {
+  const sel = document.getElementById('site-select');
+  if (!sel) return;
+  sel.innerHTML = '';
+  Object.entries(appState.sites).forEach(([id, site]) => {
+    const opt = document.createElement('option');
+    opt.value = id; opt.textContent = site.name; opt.selected = id === activeSiteId;
+    sel.appendChild(opt);
+  });
+}
+
+async function switchSite(id) {
+  activeSiteId = id;
+  localStorage.setItem('rtss_activeSite', id);
+  showStatus('Loading...', '#ffb347');
+  await loadSiteData(id);
+  showStatus('', '');
+}
+
+function openSiteManager() {
+  const name = prompt('New site name:');
+  if (!name) return;
+  const id = 'site-' + Date.now();
+  apiFetch('/sites', 'POST', { id, name }).then(() => {
+    appState.sites[id] = { name };
+    buildSiteSelect();
+    switchSite(id);
+  });
+}
+
+
+// ==================== RIE API ====================
+const API = 'https://rie-api-production.up.railway.app';
+let appState = { sites: {} };
+let activeSiteId = null;
+
+async function apiFetch(path, method, body) {
+  const opts = { method: method || 'GET', headers: { 'Content-Type': 'application/json' } };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(API + path, opts);
+  if (!res.ok) throw new Error('API error ' + res.status);
+  return res.json();
+}
+
+function showStatus(msg, color) {
+  const el = document.getElementById('api-status');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.color = color || '#666';
+  if (color === '#6dbf6d') setTimeout(() => { el.textContent = ''; }, 3000);
+}
+
+async function loadApp() {
+  showStatus('Connecting...', '#ffb347');
+  try {
+    const sites = await apiFetch('/sites');
+    appState.sites = {};
+    sites.forEach(s => { appState.sites[s.id] = { name: s.name }; });
+    if (Object.keys(appState.sites).length === 0) {
+      const id = 'site-' + Date.now();
+      await apiFetch('/sites', 'POST', { id, name: 'Default Site' });
+      appState.sites[id] = { name: 'Default Site' };
+    }
+    const saved = localStorage.getItem('rtss_activeSite');
+    activeSiteId = (saved && appState.sites[saved]) ? saved : Object.keys(appState.sites)[0];
+    buildSiteSelect();
+    await loadSiteData(activeSiteId);
+    showStatus('Connected', '#6dbf6d');
+  } catch(e) {
+    showStatus('API offline', '#ff4444');
+  }
+}
+
+async function loadSiteData(id) {
+  try {
+    const data = await apiFetch('/sites/' + id + '/survey');
+    if (data && Object.keys(data).length > 0) populateRTSSFields(data);
+  } catch(e) {}
+}
+
+async function saveSiteData() {
+  const data = collectRTSSFields();
+  try {
+    await apiFetch('/sites/' + activeSiteId + '/survey', 'PUT', data);
+    showStatus('Saved', '#6dbf6d');
+  } catch(e) {
+    showStatus('Save failed', '#ff4444');
+  }
+}
+
+function collectRTSSFields() {
+  const data = {};
+  document.querySelectorAll('input[id], select[id], textarea[id]').forEach(el => {
+    data[el.id] = el.type === 'checkbox' ? el.checked : el.value;
+  });
+  return data;
+}
+
+function populateRTSSFields(data) {
+  Object.entries(data).forEach(([id, val]) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (el.type === 'checkbox') el.checked = val;
+    else el.value = val;
+  });
+}
+
+function buildSiteSelect() {
+  const sel = document.getElementById('site-select');
+  if (!sel) return;
+  sel.innerHTML = '';
+  Object.entries(appState.sites).forEach(([id, site]) => {
+    const opt = document.createElement('option');
+    opt.value = id; opt.textContent = site.name; opt.selected = id === activeSiteId;
+    sel.appendChild(opt);
+  });
+}
+
+async function switchSite(id) {
+  activeSiteId = id;
+  localStorage.setItem('rtss_activeSite', id);
+  showStatus('Loading...', '#ffb347');
+  await loadSiteData(id);
+  showStatus('', '');
+}
+
+function openSiteManager() {
+  const name = prompt('New site name:');
+  if (!name) return;
+  const id = 'site-' + Date.now();
+  apiFetch('/sites', 'POST', { id, name }).then(() => {
+    appState.sites[id] = { name };
+    buildSiteSelect();
+    switchSite(id);
+  });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const p2Actions = document.querySelector('#page2 .actions');
   if (p2Actions) {
