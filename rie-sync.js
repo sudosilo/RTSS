@@ -100,6 +100,107 @@
     }
   }
 
+
+  const LINKS = {
+    'Restaurant / Business Name#1': 'business_name',
+    'Brand / Chain#1': 'brand',
+    'Address#1': 'address',
+    'City#1': 'city',
+    'stateSelect#1': 'state',
+    'ispField#1': 'isp',
+    'POS Software (site-wide)#1': 'pos_brand',
+    'Firewall / Router Vendor#1': 'firewall_vendor'
+  };
+  function linkedFields() {
+    return fieldEntries().filter(([k]) => LINKS[k]).map(([k, el]) => [LINKS[k], el]);
+  }
+  function afterProfileApplied() {
+    updateProgress();
+    renderTopology();
+    queueSave();
+  }
+
+  // ===== SHARED SITE PROFILE =====
+  let profileTimer = null;
+  let profilePending = {};
+
+  // A select left on its first option (Select..., Unknown / TBD) counts as empty.
+  function linkedValue(el) {
+    if (el.tagName === 'SELECT' && el.selectedIndex <= 0) return '';
+    return (el.value || '').trim();
+  }
+
+  function setLinked(el, v) {
+    if (el.tagName === 'SELECT') {
+      const want = String(v).trim().toLowerCase();
+      const opt = [...el.options].find((o) => o.value.toLowerCase() === want || o.text.trim().toLowerCase() === want);
+      if (!opt || el.value === opt.value) return false;
+      el.value = opt.value;
+    } else {
+      if (el.value === v) return false;
+      el.value = v;
+    }
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  }
+
+  function applyProfile(profile) {
+    if (!profile) return;
+    const wasRestoring = restoring;
+    restoring = true;
+    let changed = false;
+    try {
+      linkedFields().forEach(([key, el]) => {
+        const v = profile[key];
+        if (v && el !== document.activeElement && setLinked(el, v)) changed = true;
+      });
+    } finally {
+      restoring = wasRestoring;
+    }
+    if (changed) afterProfileApplied();
+  }
+
+  // Push values this tool has but the profile lacks, so older saves fill the profile once.
+  function backfillProfile(profile) {
+    const patch = {};
+    linkedFields().forEach(([key, el]) => {
+      const v = linkedValue(el);
+      if (v && !(profile && profile[key]) && !patch[key]) patch[key] = v;
+    });
+    if (Object.keys(patch).length) sendProfile(patch);
+  }
+
+  async function sendProfile(patch) {
+    if (!activeSiteId) return;
+    try { await api('/sites/' + activeSiteId + '/profile', 'PATCH', patch); } catch (e) {}
+  }
+
+  function queueProfile(target) {
+    if (restoring || !activeSiteId) return;
+    const hit = linkedFields().find(([, el]) => el === target);
+    if (!hit) return;
+    profilePending[hit[0]] = linkedValue(target);
+    clearTimeout(profileTimer);
+    profileTimer = setTimeout(() => {
+      const patch = profilePending;
+      profilePending = {};
+      sendProfile(patch);
+    }, 1200);
+  }
+
+  async function pullProfile(backfill) {
+    if (!activeSiteId) return;
+    try {
+      const profile = await api('/sites/' + activeSiteId + '/profile');
+      applyProfile(profile);
+      if (backfill) backfillProfile(profile);
+    } catch (e) {}
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') pullProfile(false);
+  });
+
   async function save() {
     if (!activeSiteId) { status('Pick a site first', 'warn'); return; }
     clearTimeout(saveTimer);
@@ -150,6 +251,7 @@
     status('Loading', 'busy');
     try {
       restore(await api('/sites/' + activeSiteId + '/survey'));
+      await pullProfile(true);
       status('Synced', 'ok');
     } catch (e) {
       status('Load failed', 'err');
@@ -203,8 +305,8 @@
   async function init() {
     buildBar();
     const root = scope();
-    root.addEventListener('input', queueSave);
-    root.addEventListener('change', queueSave);
+    root.addEventListener('input', (e) => { queueSave(); queueProfile(e.target); });
+    root.addEventListener('change', (e) => { queueSave(); queueProfile(e.target); });
     root.addEventListener('click', (e) => {
       if (e.target.closest('.vendor-chip, button, .counter-btn')) queueSave();
     });
