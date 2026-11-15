@@ -84,6 +84,14 @@ const CUSTOM_TECH = {
   ]
 };
 
+const VISITS = {
+  id: 'visits', type: 'list', noun: 'Visit', addLabel: 'Log a visit', titleField: 'date', fields: [
+    { id: 'date', label: 'Date', type: 'date' },
+    { id: 'role', label: 'Here As', type: 'select', opts: ['Survey', 'Install', 'Service call', 'Inspection', 'Drive by', 'Other'] },
+    { id: 'notes', label: 'What Changed or What You Saw', type: 'area', ph: 'New equipment, things moved, problems found' }
+  ]
+};
+
 const COUNT = (id, label, sub) => ({ id, label, sub, type: 'counter' });
 
 export const SECTIONS = [
@@ -96,6 +104,10 @@ export const SECTIONS = [
       { id: 'address', label: 'Address', type: 'text', ph: 'Street address', link: 'address', old: 'Address' },
       { id: 'city', label: 'City', type: 'text', ph: 'City', link: 'city', old: 'City' },
       { id: 'state', label: 'State', type: 'select', opts: [['', 'Select state...'], 'AZ', 'CA', 'TX', 'FL', 'NY', 'NV', 'CO', 'WA', 'OR', 'IL', 'GA', 'NC', 'Other'], link: 'state', old: 'stateSelect' },
+      { type: 'sub', label: 'Location' },
+      { id: 'lat', label: 'Latitude', type: 'number', ph: 'Like 36.1699' },
+      { id: 'lon', label: 'Longitude', type: 'number', ph: 'Like -115.1398' },
+      { id: 'locate', type: 'locate', label: 'Use my location', targets: ['lat', 'lon'] },
   ] },
   { id: 'venue', title: 'Venue Type', fields: [
       { id: 'buildingType', label: 'Building Type', type: 'select', opts: [['', 'Select...'], 'Standalone Building', 'Strip Mall / Inline', 'Food Court', 'Airport', 'Military Base / Government Facility', 'Hotel / Casino', 'Stadium / Arena', 'Healthcare Campus', 'College / University', 'Ghost Kitchen / Cloud Kitchen', 'Other'], old: 'Building Type' },
@@ -237,6 +249,8 @@ export const SECTIONS = [
       { id: 'recommendedFollowUpActions', label: 'Recommended Follow-Up Actions', type: 'area', ph: 'What needs to happen before proposal, quotes needed, access issues, callbacks...', old: 'Recommended Follow-Up Actions' },
       { id: 'estimatedProjectComplexity', label: 'Estimated Project Complexity', type: 'select', opts: ['Low, standard install, no surprises', 'Medium, a few custom elements', 'High, significant integration or infrastructure work', 'High+, requires engineering'], old: 'Estimated Project Complexity' },
       { id: 'proposalPriority', label: 'Proposal Priority', type: 'select', opts: ['Standard', 'Urgent, client ready to move', 'On hold'], old: 'Proposal Priority' },
+      { type: 'sub', label: 'Visit Log' },
+      VISITS,
   ] }
 ];
 

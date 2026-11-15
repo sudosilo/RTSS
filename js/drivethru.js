@@ -394,6 +394,9 @@ export function renderDriveThru(root) {
       h('p', {}, 'This site has no drive-thru model yet. Starting one lays out a single lane around the building with the usual equipment, ready to move into place.'),
       h('button', { type: 'button', class: 'primary', id: 'dtStart', onclick: () => {
         state.doc.dt = M.defaults();
+        // start the sun model at the site's pin when it has one
+        const la = parseFloat(state.doc.f['site.lat']), lo = parseFloat(state.doc.f['site.lon']);
+        if (isFinite(la) && isFinite(lo)) { state.doc.dt.lat = la; state.doc.dt.lon = lo; }
         state.doc.f['venue.driveThru'] = true;
         touched({ src: 'dt' });
         renderDriveThru(root);

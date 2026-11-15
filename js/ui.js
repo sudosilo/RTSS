@@ -72,6 +72,22 @@ function fieldEl(f, acc, ctx, changed) {
   if (f.type === 'sub') return h('div', { class: 'subhead' }, f.label);
   if (f.type === 'list') return ctx.list ? ctx.list(f) : null;
 
+  if (f.type === 'locate') {
+    const b = h('button', { type: 'button', class: 'locate', onclick: () => {
+      if (!navigator.geolocation) { b.textContent = 'Location not available'; return; }
+      b.textContent = 'Finding you';
+      navigator.geolocation.getCurrentPosition(pos => {
+        const [la, lo] = f.targets;
+        acc.set(la, Math.round(pos.coords.latitude * 1e5) / 1e5);
+        acc.set(lo, Math.round(pos.coords.longitude * 1e5) / 1e5);
+        const root = b.closest('.grid');
+        [la, lo].forEach(t => { const el = root && root.querySelector('[data-path="' + (ctx.prefix || '') + t + '"]'); if (el) el.value = acc.get(t); });
+        b.textContent = f.label;
+        changed();
+      }, () => { b.textContent = 'Location not available'; }, { enableHighAccuracy: true, timeout: 15000 });
+    } }, f.label);
+    return b;
+  }
   if (f.type === 'check') {
     return h('label', { class: 'check full' }, h('input', { type: 'checkbox', checked: !!cur, 'data-path': path, onchange: e => put(e.target.checked) }), f.label);
   }

@@ -1,6 +1,7 @@
 // RTSS store. One document per site holds everything: survey answers, lists, the integration profile,
 // cabling numbers and the drive-thru model. It saves to the shared RIE API and keeps a copy on the phone.
 import { SECTIONS, LISTS, eachField } from './schema.js';
+import { siteFromUrl, siteToUrl } from './apps.js';
 
 export const API = (typeof window !== 'undefined' && window.RIE_API) || 'https://rie-api-production.up.railway.app';
 const SITE_KEY = 'rie_activeSite';
@@ -194,8 +195,8 @@ export async function loadSites() {
     } catch (e2) {}
   }
   emit('sites');
-  let saved = '';
-  try { saved = localStorage.getItem(SITE_KEY) || ''; } catch (e) {}
+  let saved = siteFromUrl();
+  if (!state.sites[saved]) { try { saved = localStorage.getItem(SITE_KEY) || ''; } catch (e) {} }
   const first = state.sites[saved] ? saved : (Object.keys(state.sites)[0] || null);
   if (first) await openSite(first);
   else setStatus(state.online ? 'Create a site' : 'Offline', state.online ? 'warn' : 'err');
@@ -210,6 +211,7 @@ export async function openSite(id) {
   state.demo = false;
   state.siteId = id || null;
   try { localStorage.setItem(SITE_KEY, state.siteId || ''); } catch (e) {}
+  siteToUrl(state.siteId);
   if (!state.siteId) { state.doc = blankDoc(); emit('load'); return; }
   setStatus('Loading', 'busy');
   const cached = cacheRead(id);
@@ -262,6 +264,7 @@ export function loadDemoDoc(doc) {
   if (dirty && state.siteId && !state.demo) save();
   state.demo = true;
   state.siteId = null;
+  siteToUrl('');
   state.doc = shapeDoc(doc);
   emit('sites');
   emit('load');

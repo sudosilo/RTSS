@@ -5,6 +5,7 @@ import { h, fill, fieldGrid, dropCard, listBox, download } from './ui.js';
 import { renderTopology, renderProfile, renderCabling, csvRows } from './derived.js';
 import { renderDriveThru } from './drivethru.js';
 import { defaults as dtDefaults } from './dtmodel.js';
+import { mountMenu } from './apps.js';
 
 const $ = id => document.getElementById(id);
 const TAB_KEY = 'rtss3:tab';
@@ -18,7 +19,7 @@ if (!TABS.some(t => t[0] === tab)) tab = 'survey';
 function tally(sec) {
   let done = 0, all = 0;
   sec.fields.forEach(f => {
-    if (f.skip || f.type === 'sub' || f.type === 'check' || f.type === 'toggle') return;
+    if (f.skip || f.type === 'sub' || f.type === 'check' || f.type === 'toggle' || f.type === 'locate') return;
     if (f.when && !get(f.when)) return;
     all++;
     if (f.type === 'list' ? state.doc.l[f.id].length : isSet(get(sec.id + '.' + f.id))) done++;
@@ -141,6 +142,7 @@ function init() {
   on('sites', fillSites);
   on('load', () => { fillSites(); show(); });
   on('change', info => { if (info.src !== 'dt') updateSurveyBits(); });
+  mountMenu($('menuBtn'), 'rtss', () => state.siteId);
   show();
   loadSites();
 }
