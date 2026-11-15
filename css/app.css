@@ -167,3 +167,11 @@ footer { text-align: center; font-size: 11px; color: var(--muted); padding: 4px 
 .app-link.here { background: var(--accent-soft); }
 a.app-link:active { background: var(--soft); }
 .locate { grid-column: 1 / -1; }
+
+/* Field Twin card, shown when RTSS is opened inside Field Twin */
+.ft-card { border-color: var(--accent, #0b4ea2); margin-bottom: 10px; }
+.ft-card h2 { margin: 0 0 6px; font-size: 15px; }
+.ft-card .hint { margin: 4px 0; }
+.ft-stop { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); }
+.ft-stop b { font-size: 14px; }
+.ft-stop button { flex: 0 0 auto; }

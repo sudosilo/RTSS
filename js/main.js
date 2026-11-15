@@ -5,7 +5,7 @@ import { h, fill, fieldGrid, dropCard, listBox, download } from './ui.js';
 import { renderTopology, renderProfile, renderCabling, csvRows } from './derived.js';
 import { renderDriveThru } from './drivethru.js';
 import { defaults as dtDefaults } from './dtmodel.js';
-import { mountMenu } from './apps.js';
+import { mountMenu, IN_FIELD_TWIN, askFieldTwin, onFieldTwin, fieldTwinContext } from './apps.js';
 
 const $ = id => document.getElementById(id);
 const TAB_KEY = 'rtss3:tab';
@@ -31,7 +31,7 @@ let badges = [];
 function renderSurvey(root) {
   badges = [];
   const bar = h('div', { class: 'progress' }, h('i', { id: 'progressFill' }));
-  const kids = [bar];
+  const kids = [bar, fieldTwinCard()];
   SECTIONS.forEach((sec, n) => {
     const acc = { get: id => get(sec.id + '.' + id), set: (id, v) => set(sec.id + '.' + id, v, 'form') };
     const grid = fieldGrid(sec.fields, acc, {
@@ -43,7 +43,7 @@ function renderSurvey(root) {
     badges.push([sec, card]);
     kids.push(card);
   });
-  root.replaceChildren(...kids);
+  root.replaceChildren(...kids.filter(Boolean));
   const isp = root.querySelector('[data-path="net.isp"]');
   if (isp) isp.setAttribute('list', 'ispList');
   updateSurveyBits();
@@ -57,6 +57,49 @@ function updateSurveyBits() {
   const list = $('ispList');
   list.replaceChildren(...(ISP_BY_STATE[get('site.state')] || []).map(n => h('option', { value: n })));
   $('siteTitle').textContent = get('site.name') || (state.demo ? 'Demo site' : 'New survey');
+}
+
+
+// ===== FROM FIELD TWIN =====
+// Opened inside Field Twin, the blank site questions fill from what Field Twin knows about this place. Its stops
+// here are listed so each one can be added to the visit log with a tap; none are added on their own.
+const STATE_OPTS = (SECTIONS.find(s => s.id === 'site').fields.find(f => f.id === 'state').opts || []).map(o => (Array.isArray(o) ? o[0] : o));
+function fieldTwinFill(ctx) {
+  if (!ctx || ctx.site !== state.siteId || state.demo) return;
+  let changed = false;
+  const put = (path, v) => {
+    if (v === undefined || v === null || v === '' || isSet(get(path))) return;
+    set(path, String(v), 'ft');
+    changed = true;
+  };
+  put('site.name', ctx.business);
+  put('site.address', ctx.address);
+  put('site.city', ctx.city);
+  if (ctx.state && STATE_OPTS.includes(ctx.state)) put('site.state', ctx.state);
+  if (isFinite(ctx.lat) && isFinite(ctx.lon) && !isSet(get('site.lat')) && !isSet(get('site.lon'))) { put('site.lat', ctx.lat); put('site.lon', ctx.lon); }
+  show();
+  if (changed) save();
+}
+function fieldTwinCard() {
+  const ctx = fieldTwinContext();
+  if (!IN_FIELD_TWIN || !ctx || ctx.site !== state.siteId || state.demo) return null;
+  const stops = ctx.stops || [];
+  const visits = state.doc.l.visits;
+  const rows = stops.map(st => {
+    const have = visits.some(v => v.ft === st.id);
+    return h('div', { class: 'ft-stop' },
+      h('div', {}, h('b', {}, st.date + (st.kind ? ', ' + st.kind : '')), st.notes ? h('p', { class: 'hint' }, st.notes) : null),
+      have ? h('span', { class: 'hint' }, 'In the visit log') : h('button', { type: 'button', onclick: () => {
+        visits.push({ date: st.date, role: st.role || 'Other', notes: st.notes || '', ft: st.id });
+        touched({ src: 'ft' });
+        show();
+      } }, 'Add to visit log'));
+  });
+  return h('section', { class: 'card ft-card' },
+    h('h2', {}, 'From Field Twin'),
+    h('p', { class: 'hint' }, 'Blank site questions were filled from Field Twin: name, address, city, state and location. Anything already answered was left alone.'),
+    stops.length ? h('p', { class: 'hint' }, 'Stops Field Twin logged here. Add the ones you want to the visit log.') : h('p', { class: 'hint' }, 'No Field Twin stops logged here yet.'),
+    rows);
 }
 
 // ===== MORE TAB =====
@@ -140,7 +183,8 @@ function init() {
   });
   on('status', ([msg, kind]) => { const el = $('status'); el.textContent = msg; el.dataset.kind = kind; });
   on('sites', fillSites);
-  on('load', () => { fillSites(); show(); });
+  on('load', () => { fillSites(); show(); askFieldTwin(state.siteId); });
+  onFieldTwin(fieldTwinFill);
   on('change', info => { if (info.src !== 'dt') updateSurveyBits(); });
   mountMenu($('menuBtn'), 'rtss', () => state.siteId);
   show();
