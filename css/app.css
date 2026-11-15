@@ -175,3 +175,7 @@ a.app-link:active { background: var(--soft); }
 .ft-stop { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); }
 .ft-stop b { font-size: 14px; }
 .ft-stop button { flex: 0 0 auto; }
+
+/* Account box at the bottom of the apps menu */
+.acct { display: grid; gap: 8px; margin-top: 18px; }
+.acct input { width: 100%; box-sizing: border-box; }
